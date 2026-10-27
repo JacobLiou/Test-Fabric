@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TestFabric.Core\TestFabric.Core.csproj" />
+    <ProjectReference Include="..\..\src\TestFabric.Contracts\TestFabric.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\TestFabric.Sdk\TestFabric.Sdk.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+  </ItemGroup>
+</Project>

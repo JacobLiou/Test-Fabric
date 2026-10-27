@@ -1,0 +1,10 @@
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+artifacts/
+logs/
+postgres-data/
+.tools/
+appsettings.*.local.json

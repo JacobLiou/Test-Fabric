@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>Test Fabric — 资源看板</title>
+<style>
+  :root { --bg:#0f1419; --panel:#161d27; --line:#232d3b; --fg:#c9d4e0; --dim:#7a8a9c; --acc:#4da3ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.5 "Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel); z-index:5; }
+  header h1 { font-size:15px; margin:0; letter-spacing:.5px; }
+  header input { background:#0c1117; color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:4px 8px; width:220px; font-size:12px; }
+  .pill { padding:2px 8px; border-radius:10px; font-size:11px; border:1px solid var(--line); }
+  .ok { color:#5ad478; } .warn { color:#e6b35a; } .err { color:#ef6b73; } .busy { color:#4da3ff; } .dim { color:var(--dim); }
+  main { display:grid; grid-template-columns: 1fr 380px; gap:12px; padding:12px 16px; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; min-width:0; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin:0 0 8px; }
+  table { width:100%; border-collapse:collapse; table-layout:fixed; }
+  th { text-align:left; color:var(--dim); font-weight:500; font-size:11px; border-bottom:1px solid var(--line); padding:4px 6px; }
+  td { padding:5px 6px; border-bottom:1px solid #1a2331; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .controls { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  select, button { background:#0c1117; color:var(--fg); border:1px solid var(--line); border-radius:4px; padding:3px 8px; font-size:12px; }
+  #events { max-height:70vh; overflow-y:auto; }
+  .evt { padding:4px 6px; border-bottom:1px solid #1a2331; font-size:12px; }
+  .evt b { color:var(--acc); font-weight:500; }
+  .evt .t { color:var(--dim); font-size:11px; }
+  .bar { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .bar .pill b { font-weight:600; }
+  #conn.ok::after { content:"● SSE 已连接"; color:#5ad478; font-size:11px; }
+  #conn.err::after { content:"● SSE 断开"; color:#ef6b73; font-size:11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Test Fabric</h1>
+  <input id="token" placeholder="API Token" value="dev-viewer-token" />
+  <span id="conn"></span>
+  <span class="dim" style="margin-left:auto" id="clock"></span>
+</header>
+
+<main>
+  <section>
+    <h2>资源池</h2>
+    <div class="bar" id="summary"></div>
+    <div class="controls">
+      <select id="fState"><option value="">全部状态</option><option>Available</option><option>Busy</option><option>Recovering</option><option>Error</option><option>Unknown</option></select>
+      <select id="fType"><option value="">全部类型</option><option>OpticalSpectrumAnalyzer</option><option>OpticalPowerMeter</option></select>
+      <button onclick="refresh()">刷新</button>
+    </div>
+    <table id="resTable">
+      <thead><tr>
+        <th style="width:110px">Resource</th><th>型号</th><th>位置</th><th>运行状态</th><th>健康</th><th>连接</th><th>校准</th><th>Owner / 租约到期</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>实时事件（SSE）</h2>
+    <div class="controls"><button onclick="clearEvents()">清空</button></div>
+    <div id="events"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const state = { sse: null, events: [] };
+
+function headers() { return { 'Authorization': 'Bearer ' + $('token').value }; }
+
+function clsFor(s) {
+  return ({Available:'ok', Healthy:'ok', Online:'ok', Valid:'ok',
+           Busy:'busy', Expiring:'warn', Degraded:'warn', Recovering:'warn',
+           Offline:'err', Error:'err', Expired:'err', Unknown:'dim'})[s] || 'dim';
+}
+
+async function refresh() {
+  try {
+    const q = new URLSearchParams();
+    if ($('fState').value) q.set('status', $('fState').value);
+    if ($('fType').value) q.set('type', $('fType').value);
+    const r = await fetch('/api/v1/resources?' + q, { headers: headers() });
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    const page = await r.json();
+
+    const counts = {};
+    for (const item of page.items) counts[item.operationalState] = (counts[item.operationalState] || 0) + 1;
+    $('summary').innerHTML = `<span class="pill">总数 <b>${page.total}</b></span>` +
+      Object.entries(counts).map(([k, v]) => `<span class="pill ${clsFor(k)}">${k} <b>${v}</b></span>`).join('');
+
+    $('resTable').querySelector('tbody').innerHTML = page.items.map(r => `<tr>
+      <td title="${r.resourceId}">${r.resourceId}</td>
+      <td title="${r.manufacturer} ${r.model}">${r.manufacturer}<br><span class="dim">${r.model}</span></td>
+      <td>${r.location || '-'}</td>
+      <td class="${clsFor(r.operationalState)}">${r.operationalState}</td>
+      <td class="${clsFor(r.healthState)}">${r.healthState}</td>
+      <td class="${clsFor(r.connectivityState)}">${r.connectivityState}</td>
+      <td class="${clsFor(r.calibrationState)}">${r.calibrationState}</td>
+      <td>${r.currentLease ? `<span class="busy">${r.currentLease.clientId}</span><br><span class="dim">${new Date(r.currentLease.expiresAt).toLocaleTimeString()}</span>` : '-'}</td>
+    </tr>`).join('');
+  } catch (e) {
+    $('summary').innerHTML = `<span class="pill err">加载失败：${e.message}</span>`;
+  }
+}
+
+function connectSse() {
+  if (state.sse) state.sse.close();
+  const url = '/api/v1/events/stream?token=' + encodeURIComponent($('token').value);
+  const sse = new EventSource(url);
+  state.sse = sse;
+  sse.onopen = () => { $('conn').className = 'ok'; refresh(); };
+  sse.onerror = () => { $('conn').className = 'err'; };
+  sse.onmessage = ev => addEvent(JSON.parse(ev.data));
+  // 具名事件：全部注册
+  for (const t of ['ResourceStateChanged','HealthChanged','ConnectivityChanged','AcquireSucceeded','AcquireFailed',
+                   'LeaseReleased','LeaseExpired','LeaseForceReleased','HeartbeatLost','ResourceCreated','ResourceUpdated',
+                   'ResourceDisabled','ResourceEnabled','MaintenanceSet','ResourceDeleted','AdminOverride','StartupGraceApplied'])
+    sse.addEventListener(t, ev => addEvent(JSON.parse(ev.data)));
+}
+
+function addEvent(evt) {
+  state.events.unshift(evt);
+  state.events = state.events.slice(0, 200);
+  const box = $('events');
+  box.innerHTML = state.events.map(e => `<div class="evt">
+    <span class="t">${new Date(e.occurredAt).toLocaleTimeString()}</span>
+    <b>${e.eventType}</b> ${e.resourceId ? '· ' + e.resourceId : ''} ${e.clientId ? '· ' + e.clientId : ''}
+    ${e.payload && Object.keys(e.payload).length ? `<br><span class="dim">${JSON.stringify(e.payload)}</span>` : ''}
+  </div>`).join('');
+  if (evt.resourceId || evt.eventType.startsWith('Acquire') || evt.eventType.startsWith('Lease')) refresh();
+}
+
+function clearEvents() { state.events = []; $('events').innerHTML = ''; }
+
+$('token').addEventListener('change', () => { refresh(); connectSse(); });
+setInterval(() => $('clock').textContent = new Date().toISOString(), 1000);
+refresh();
+connectSse();
+setInterval(refresh, 5000); // SSE 断开时的兜底轮询（FR-09：≤5s）
+</script>
+</body>
+</html>

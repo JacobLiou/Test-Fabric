@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TestFabric.Adapters/TestFabric.Adapters.csproj" />
+    <Project Path="src/TestFabric.Api/TestFabric.Api.csproj" />
+    <Project Path="src/TestFabric.Contracts/TestFabric.Contracts.csproj" />
+    <Project Path="src/TestFabric.Core/TestFabric.Core.csproj" />
+    <Project Path="src/TestFabric.Sdk/TestFabric.Sdk.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TestFabric.IntegrationTests/TestFabric.IntegrationTests.csproj" />
+    <Project Path="tests/TestFabric.UnitTests/TestFabric.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/TestFabric.SoakCanary/TestFabric.SoakCanary.csproj" />
+  </Folder>
+</Solution>

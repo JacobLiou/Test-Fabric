@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\TestFabric.Core\TestFabric.Core.csproj" />
+    <ProjectReference Include="..\TestFabric.Contracts\TestFabric.Contracts.csproj" />
+  </ItemGroup>
+</Project>
